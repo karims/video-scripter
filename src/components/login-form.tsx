@@ -12,12 +12,14 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useUser } from "@/context/UserContext";
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
+  const { setUser } = useUser();
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -34,9 +36,12 @@ export function LoginForm({
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
               const email = formData.get("email");
+              console.log("Login email:", email);
+              console.log("Login formData:", formData);
 
               if (typeof email === "string" && email.includes("@")) {
                 sessionStorage.setItem("userEmail", email);
+                setUser({ email, id: "mock-id" }); // optionally add mock name
                 router.push("/");
               } else {
                 alert("Please enter a valid email");
@@ -75,6 +80,7 @@ export function LoginForm({
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
+                    name="email"
                     type="email"
                     placeholder="m@example.com"
                     required

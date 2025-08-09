@@ -96,7 +96,7 @@ export default function Page() {
 
         </div>
 
-        <IdeasBlock ideas={ideas} />
+        <IdeasBlock ideas={ideas} query={topic} />
       </main>
     </div>
   );
