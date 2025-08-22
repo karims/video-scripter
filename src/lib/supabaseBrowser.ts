@@ -9,7 +9,7 @@ let _client:
 export function supabaseBrowser() {
   if (!_client) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
     _client = createBrowserClient(url, anon);
   }
   return _client;

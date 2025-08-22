@@ -1,30 +1,65 @@
 // app/api/saved/route.ts
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { createSupabaseServer } from "@/lib/supabaseServer";
+import "server-only";
+import { NextResponse, type NextRequest } from "next/server";
+import { createSupabaseRouteClient } from "@/lib/supabaseRoute";
+
+export const runtime = "nodejs"; // defensive clarity
 
 export async function GET(req: NextRequest) {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { supabase, cookieResponse } = createSupabaseRouteClient(req);
+
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr || !user) {
+    const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+    return res;
+  }
 
   const { data, error } = await supabase
     .from("saved_ideas")
     .select("id, idea_id, title, description, created_at")
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ items: data });
+  if (error) {
+    const res = NextResponse.json({ error: error.message }, { status: 400 });
+    for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+    return res;
+  }
+
+  const res = NextResponse.json({ items: data ?? [] }, { status: 200 });
+  for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+  return res;
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { supabase, cookieResponse } = createSupabaseRouteClient(req);
 
-  const body = await req.json();
-  const { idea_id, title, description } = body || {};
-  if (!idea_id || !title) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr || !user) {
+    const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+    return res;
+  }
+
+  // Parse body exactly once
+  const body = await req.json().catch(() => null);
+  const idea_id = body?.idea_id?.toString().trim();
+  const title = body?.title?.toString().trim();
+  const description = body?.description?.toString() ?? null;
+
+  if (!idea_id || !title) {
+    const res = NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+    return res;
+  }
 
   const { data, error } = await supabase
     .from("saved_ideas")
@@ -32,6 +67,13 @@ export async function POST(req: NextRequest) {
     .select("id, idea_id, title, description, created_at")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ item: data }, { status: 201 });
+  if (error) {
+    const res = NextResponse.json({ error: error.message }, { status: 400 });
+    for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+    return res;
+  }
+
+  const res = NextResponse.json({ item: data }, { status: 201 });
+  for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+  return res;
 }
