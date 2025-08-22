@@ -1,103 +1,82 @@
+// app/page.tsx
 "use client";
+
 import { useEffect, useState } from "react";
-import HeaderBlock from "@/components/blocks/HeaderBlock";
-import HeroBlock from "@/components/blocks/HeroBlock";
-import TopicInputBlock from "@/components/blocks/TopicInputBlock";
+import { useRouter } from "next/navigation";
+import { fetchJson } from "@/lib/fetchJson";
 import IdeasBlock from "@/components/blocks/IdeasBlock";
 
-const mockIdeas = [
-  {
-    title: "10-Minute Fitness Routine for Busy Creators",
-    description: "Quick & effective workout without equipment.",
-  },
-  {
-    title: "Day in the Life: Fitness Influencer Edition",
-    description: "From smoothies to squats, a full vlog idea.",
-  },
-  {
-    title: "Beginner Home Workout That Actually Works",
-    description: "Easy, safe and results-driven exercises.",
-  },
-  {
-    title: "My 30-Day Body Transformation Story",
-    description: "Personal and relatable content for engagement.",
-  },
-  {
-    title: "5 Fitness Myths That Are Wasting Your Time",
-    description: "Bust myths and build trust with your audience.",
-  },
-];
+type Idea = { id: string; title: string; description?: string };
 
-const STORAGE_KEY = "last_video_ideas";
-
-type Idea = { title: string; description?: string };
-
-export default function Page() {
-  const [ideas, setIdeas] = useState<{ title: string; description?: string }[]>([]);
+export default function HomePage() {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(false);
-  const [topic, setTopic] = useState("");
-  
-    // Load last ideas on page load
+  const [err, setErr] = useState<string | null>(null);
+
+  // ✅ Just restore last session results
   useEffect(() => {
-    const saved = sessionStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setIdeas(parsed);
-      } catch {}
-    }
+    try {
+      const last = sessionStorage.getItem("lastIdeasPayload");
+      if (last) {
+        const { query, ideas } = JSON.parse(last);
+        setQuery(query || "");
+        setIdeas(ideas || []);
+      }
+    } catch {}
   }, []);
 
-  const handleGenerate = () => {
-    if (!topic.trim()) return;
+  const onSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault?.();
+    const q = query.trim();
+    if (!q) return;
 
-    setLoading(true);
-    setIdeas([]);
+    try {
+      setLoading(true);
+      setErr(null);
 
-    setTimeout(() => {
-      const newIdeas = mockIdeas; // mock data for now
-      setIdeas(newIdeas);
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(newIdeas));
+      const data = await fetchJson<{ ideas: Idea[] }>("/api/ideas", {
+        method: "POST",
+        body: JSON.stringify({ query: q }),
+      });
+
+      setIdeas(data.ideas);
+      sessionStorage.setItem("lastIdeasPayload", JSON.stringify({ query: q, ideas: data.ideas }));
+    } catch (e: any) {
+      // if (e.code === 401) router.push("/login");
+      if (e.code === 401) setErr("Please sign in to generate ideas. It’s quick!");
+      else if (e.code === 402) router.push("/pricing?limit=free");
+      else setErr(e.message || "Something went wrong");
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
-    <div className="flex flex-col min-h-screen items-center">
-      <main className="flex-1 flex flex-col items-center w-full">
-        <HeroBlock />
-        <div className="w-full max-w-xl px-4">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleGenerate();
-            }}
-            className="w-full"
-          >
-            <input
-              type="text"
-              className="w-full px-4 py-3 rounded-xl border text-base mt-4 focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Enter a topic like 'fitness'"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-            />
-            <button
-              type="submit"
-              className={`mt-4 w-full py-3 rounded-xl text-white font-medium transition ${
-                loading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-primary hover:bg-primary/90"
-              }`}
-              disabled={loading}
-            >
-              {loading ? "Generating..." : "Generate Ideas"}
-            </button>
-          </form>
+    <main className="max-w-2xl mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold text-primary">AI Video Idea Generator</h1>
 
-        </div>
+      <form onSubmit={onSubmit} className="mt-6 flex gap-3">
+        <input
+          className="flex-1 border rounded-xl px-4 py-3"
+          value={query}
+          placeholder="e.g., fitness for new moms…"
+          onChange={(e) => setQuery(e.target.value.slice(0, 120))}
+        />
+        <button
+          type="submit"
+          onClick={onSubmit}
+          className="px-5 py-3 rounded-xl bg-primary text-white disabled:opacity-60"
+          disabled={loading}
+        >
+          {loading ? "Generating…" : "Generate Ideas"}
+        </button>
+      </form>
 
-        <IdeasBlock ideas={ideas} query={topic} />
-      </main>
-    </div>
+      {err && <p className="text-red-600 mt-3 text-sm">{err}</p>}
+
+      <IdeasBlock ideas={ideas} query={query} />
+    </main>
   );
 }

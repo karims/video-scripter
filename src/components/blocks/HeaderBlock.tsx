@@ -1,44 +1,43 @@
+// src/components/blocks/HeaderBlock.tsx
 "use client";
 
-import { useUser } from "@/context/UserContext";
 import Link from "next/link";
+import { useUser } from "@/context/UserContext";
 
 export default function HeaderBlock() {
-  const { user, setUser } = useUser();
-
-  const handleLogout = () => {
-    sessionStorage.removeItem("userEmail");
-    setUser(null);
-  };
+  const { user, profile, loading, signOut } = useUser();
 
   return (
-    <header className="w-full p-4 flex justify-between items-center border-b bg-white">
+    <header className="w-full px-4 py-3 flex justify-between items-center border-b bg-white">
       <Link href="/" className="text-xl font-bold text-primary">
         🎬 VideoSpark
       </Link>
 
-      {user?.email ? (
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <Link
-            href="/saved"
-            className="text-sm font-medium hover:underline text-primary"
-          >
-            Saved Ideas
-          </Link>
+      <nav className="flex items-center gap-4 text-sm">
+        <Link href="/pricing" className="hover:underline">Pricing</Link>
+        {user && <Link href="/saved" className="hover:underline">Saved</Link>}
 
-          <span>{user.email}</span>
-          <button
-            onClick={handleLogout}
-            className="text-black-500 underline hover:text-red-700"
-          >
-            Logout
-          </button>
-        </div>
-      ) : (
-        <Link href="/login" className="text-sm font-medium hover:underline">
-          Login / Signup
-        </Link>
-      )}
+        {loading ? (
+          <span className="text-muted-foreground">…</span>
+        ) : user ? (
+          <div className="flex items-center gap-3">
+            <span className="truncate max-w-[160px] text-muted-foreground">
+              {profile?.name || user.email}
+            </span>
+            <button
+              onClick={signOut}
+              className="underline hover:text-red-700"
+              aria-label="Logout"
+            >
+              Logout
+            </button>
+          </div>
+        ) : (
+          <Link href="/login" className="font-medium hover:underline">
+            Login / Signup
+          </Link>
+        )}
+      </nav>
     </header>
   );
 }

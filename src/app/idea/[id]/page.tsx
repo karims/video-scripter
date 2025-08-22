@@ -1,130 +1,112 @@
+// app/idea/[id]/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { fetchJson } from "@/lib/fetchJson";
 import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const mockIdeas = [
-  {
-    title: "10-Minute Fitness Routine for Busy Creators",
-    description: "Quick & effective workout without equipment.",
-  },
-  {
-    title: "Day in the Life: Fitness Influencer Edition",
-    description: "From smoothies to squats, a full vlog idea.",
-  },
-  {
-    title: "Beginner Home Workout That Actually Works",
-    description: "Easy, safe and results-driven exercises.",
-  },
-  {
-    title: "My 30-Day Body Transformation Story",
-    description: "Personal and relatable content for engagement.",
-  },
-  {
-    title: "5 Fitness Myths That Are Wasting Your Time",
-    description: "Bust myths and build trust with your audience.",
-  },
+type SavedRow = { id: string; idea_id: string; title: string; description?: string | null };
+type Idea = { title: string; description?: string };
+
+const mockIdeas: Idea[] = [
+  { title: "10-Minute Fitness Routine for Busy Creators", description: "Quick & effective workout without equipment." },
+  { title: "Day in the Life: Fitness Influencer Edition", description: "From smoothies to squats, a full vlog idea." },
+  { title: "Beginner Home Workout That Actually Works", description: "Easy, safe and results-driven exercises." },
+  { title: "My 30-Day Body Transformation Story", description: "Personal and relatable content for engagement." },
+  { title: "5 Fitness Myths That Are Wasting Your Time", description: "Bust myths and build trust with your audience." },
 ];
 
 export default function IdeaDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const idea = mockIdeas[+params.id];
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [isSaved, setIsSaved] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const ideaIndex = Number(params.id);
+  const idea = useMemo(() => mockIdeas[ideaIndex], [ideaIndex]);
+
+  const [loading, setLoading] = useState(false);
+  const [savedRow, setSavedRow] = useState<SavedRow | null>(null);
+  const [loginModal, setLoginModal] = useState(false);
 
   useEffect(() => {
-    const email = sessionStorage.getItem("userEmail");
-    setUserEmail(email);
+    // Check if this idea is already saved for the logged-in user
+    (async () => {
+      try {
+        const data = await fetchJson<{ items: SavedRow[] }>("/api/saved", { method: "GET", cache: "no-store" as any });
+        const found = data.items.find((r) => r.idea_id === params.id);
+        setSavedRow(found || null);
+      } catch (e: any) {
+        if (e.code === 401) {
+          // not logged in — ignore; we’ll show login modal on click
+          setSavedRow(null);
+        }
+      }
+    })();
+  }, [params.id]);
 
-    if (email && idea) {
-      const allSaved = JSON.parse(sessionStorage.getItem("savedIdeas") || "{}");
-      const savedByUser = allSaved[email] || [];
-      const alreadySaved = savedByUser.some((i: any) => i.title === idea.title);
-      setIsSaved(alreadySaved);
+  const toggleSave = async () => {
+    if (!idea) return;
+    try {
+      setLoading(true);
+      if (savedRow) {
+        await fetchJson(`/api/saved/${savedRow.id}`, { method: "DELETE" });
+        setSavedRow(null);
+      } else {
+        const res = await fetchJson<{ item: SavedRow }>("/api/saved", {
+          method: "POST",
+          body: JSON.stringify({ idea_id: params.id, title: idea.title, description: idea.description }),
+        });
+        setSavedRow(res.item);
+      }
+    } catch (e: any) {
+      if (e.code === 401) setLoginModal(true);
+      else if (e.code === 402) router.push("/pricing?limit=free");
+      else console.error(e);
+    } finally {
+      setLoading(false);
     }
-  }, [idea]);
-
-  const handleSaveToggle = () => {
-    if (!userEmail || !idea) {
-      setShowLoginModal(true);
-      return;
-    }
-
-    const allSaved = JSON.parse(sessionStorage.getItem("savedIdeas") || "{}");
-    const savedByUser = allSaved[userEmail] || [];
-
-    if (isSaved) {
-      const updated = savedByUser.filter((i: any) => i.title !== idea.title);
-      allSaved[userEmail] = updated;
-      setIsSaved(false);
-    } else {
-      const updated = [...savedByUser, { ...idea, id: params.id }];
-      allSaved[userEmail] = updated;
-      setIsSaved(true);
-    }
-
-    sessionStorage.setItem("savedIdeas", JSON.stringify(allSaved));
   };
 
-  if (!idea) return <p className="p-6">Invalid idea.</p>;
+  if (!idea) return <main className="max-w-3xl mx-auto p-6">Idea not found.</main>;
 
   return (
-    <main className="max-w-3xl mx-auto p-6">
-      {/* Title and Save Icon Inline */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-primary flex-1">
-          📹 {idea.title}
-        </h1>
+    <main className="max-w-3xl mx-auto p-6 relative">
+      {/* Heart button pinned to the card’s top-right inside main */}
+      <button
+        onClick={toggleSave}
+        disabled={loading}
+        title={savedRow ? "Unsave" : "Save"}
+        className={cn(
+          "absolute -top-2 right-2 px-2 py-1 text-2xl leading-none",
+          savedRow ? "text-red-500" : "text-black/70 hover:text-black"
+        )}
+        aria-label={savedRow ? "Unsave Idea" : "Save Idea"}
+      >
+        {savedRow ? "❤️" : "🖤"}
+      </button>
 
-        <button
-          onClick={handleSaveToggle}
-          title={userEmail ? (isSaved ? "Unsave Idea" : "Save Idea") : "Login to Save"}
-          className={cn(
-            "text-3xl transition ml-4",
-            isSaved ? "text-red-500" : "text-black/60 hover:text-black"
-          )}
-        >
-          {isSaved ? "❤️" : "🖤"}
-        </button>
-      </div>
-
-      {/* Login Modal */}
-      <Dialog open={showLoginModal} onOpenChange={setShowLoginModal}>
+      {/* Login modal */}
+      <Dialog open={loginModal} onOpenChange={setLoginModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Login Required</DialogTitle>
+            <DialogTitle>Login required</DialogTitle>
           </DialogHeader>
-          <p className="text-gray-600 text-sm">
-            Please log in to save ideas to your account.
-          </p>
+          <p className="text-sm text-gray-600">Please log in to save ideas to your account.</p>
           <DialogFooter>
             <Button onClick={() => router.push("/login")}>Go to Login</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Idea Description */}
+      <h1 className="text-3xl font-bold mb-6 text-primary">📹 {idea.title}</h1>
       <p className="text-lg leading-relaxed text-gray-800 mb-10">{idea.description}</p>
 
       <div className="flex gap-4 flex-wrap">
-        <Button
-          onClick={() => navigator.clipboard.writeText(idea.title)}
-          className="bg-primary text-white"
-        >
+        <Button onClick={() => navigator.clipboard.writeText(idea.title)} className="bg-primary text-white">
           📋 Copy Title
         </Button>
-
         <Button variant="secondary" onClick={() => router.push("/")}>
           ← Back to Search
         </Button>
