@@ -1,21 +1,15 @@
-// app/api/saved/route.ts
 import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
-import { createSupabaseRouteClient } from "@/lib/supabaseRoute";
+import { createSupabaseRouteClient } from "@/utils/supabase/route";
 
-export const runtime = "nodejs"; // defensive clarity
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const { supabase, cookieResponse } = createSupabaseRouteClient(req);
-
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
   if (userErr || !user) {
     const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+    for (const c of cookieResponse.cookies.getAll()) res.cookies.set(c);
     return res;
   }
 
@@ -26,30 +20,24 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     const res = NextResponse.json({ error: error.message }, { status: 400 });
-    for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+    for (const c of cookieResponse.cookies.getAll()) res.cookies.set(c);
     return res;
   }
 
   const res = NextResponse.json({ items: data ?? [] }, { status: 200 });
-  for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+  for (const c of cookieResponse.cookies.getAll()) res.cookies.set(c);
   return res;
 }
 
 export async function POST(req: NextRequest) {
   const { supabase, cookieResponse } = createSupabaseRouteClient(req);
-
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
   if (userErr || !user) {
     const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+    for (const c of cookieResponse.cookies.getAll()) res.cookies.set(c);
     return res;
   }
 
-  // Parse body exactly once
   const body = await req.json().catch(() => null);
   const idea_id = body?.idea_id?.toString().trim();
   const title = body?.title?.toString().trim();
@@ -57,7 +45,7 @@ export async function POST(req: NextRequest) {
 
   if (!idea_id || !title) {
     const res = NextResponse.json({ error: "Missing fields" }, { status: 400 });
-    for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+    for (const c of cookieResponse.cookies.getAll()) res.cookies.set(c);
     return res;
   }
 
@@ -69,11 +57,11 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     const res = NextResponse.json({ error: error.message }, { status: 400 });
-    for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+    for (const c of cookieResponse.cookies.getAll()) res.cookies.set(c);
     return res;
   }
 
   const res = NextResponse.json({ item: data }, { status: 201 });
-  for (const cookie of cookieResponse.cookies.getAll()) res.cookies.set(cookie);
+  for (const c of cookieResponse.cookies.getAll()) res.cookies.set(c);
   return res;
 }

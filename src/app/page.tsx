@@ -3,8 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { fetchJson } from "@/lib/fetchJson";
-import IdeasBlock from "@/components/blocks/IdeasBlock";
+// (If fetchJson doesn't force content-type, we can inline fetch to be sure.)
 
 type Idea = { id: string; title: string; description?: string };
 
@@ -15,7 +14,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // ✅ Just restore last session results
   useEffect(() => {
     try {
       const last = sessionStorage.getItem("lastIdeasPayload");
@@ -27,27 +25,30 @@ export default function HomePage() {
     } catch {}
   }, []);
 
-  const onSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
-    e?.preventDefault?.();
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     const q = query.trim();
     if (!q) return;
 
+    setLoading(true);
+    setErr(null);
     try {
-      setLoading(true);
-      setErr(null);
-
-      const data = await fetchJson<{ ideas: Idea[] }>("/api/ideas", {
+      const r = await fetch("/api/ideas", {
         method: "POST",
+        headers: { "Content-Type": "application/json" }, // ensure JSON
         body: JSON.stringify({ query: q }),
       });
-
+      const data = await r.json();
+      if (!r.ok) {
+        if (r.status === 401) setErr("Please sign in to generate ideas. It’s quick!");
+        else if (r.status === 402) router.push("/pricing?limit=free");
+        else setErr(data?.error || "Something went wrong");
+        return;
+      }
       setIdeas(data.ideas);
       sessionStorage.setItem("lastIdeasPayload", JSON.stringify({ query: q, ideas: data.ideas }));
-    } catch (e: any) {
-      // if (e.code === 401) router.push("/login");
-      if (e.code === 401) setErr("Please sign in to generate ideas. It’s quick!");
-      else if (e.code === 402) router.push("/pricing?limit=free");
-      else setErr(e.message || "Something went wrong");
+    } catch {
+      setErr("Network error");
     } finally {
       setLoading(false);
     }
@@ -66,7 +67,6 @@ export default function HomePage() {
         />
         <button
           type="submit"
-          onClick={onSubmit}
           className="px-5 py-3 rounded-xl bg-primary text-white disabled:opacity-60"
           disabled={loading}
         >
@@ -76,7 +76,7 @@ export default function HomePage() {
 
       {err && <p className="text-red-600 mt-3 text-sm">{err}</p>}
 
-      <IdeasBlock ideas={ideas} query={query} />
+      {/* keep your IdeasBlock as is */}
     </main>
   );
 }
