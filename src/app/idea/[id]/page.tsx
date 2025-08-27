@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { fetchJson } from "@/lib/fetchJson";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
@@ -21,9 +21,10 @@ const mockIdeas: Idea[] = [
   { title: "5 Fitness Myths That Are Wasting Your Time", description: "Bust myths and build trust with your audience." },
 ];
 
-export default function IdeaDetailPage({ params }: { params: { id: string } }) {
+export default function IdeaDetailPage() {
   const router = useRouter();
-  const ideaIndex = Number(params.id);
+  const params = useParams<{ id: string }>();           // ✅ useParams for app router
+  const ideaIndex = Number(params.id);                  // still using index-based URL
   const idea = useMemo(() => mockIdeas[ideaIndex], [ideaIndex]);
 
   const [loading, setLoading] = useState(false);
@@ -51,6 +52,8 @@ export default function IdeaDetailPage({ params }: { params: { id: string } }) {
     try {
       setLoading(true);
       if (savedRow) {
+        // NOTE: Your API currently doesn't expose DELETE /api/saved/[id]
+        // If/when you add it, this call will work. For now it will 404.
         await fetchJson(`/api/saved/${savedRow.id}`, { method: "DELETE" });
         setSavedRow(null);
       } else {
@@ -73,21 +76,27 @@ export default function IdeaDetailPage({ params }: { params: { id: string } }) {
 
   return (
     <main className="max-w-3xl mx-auto p-6 relative">
-      {/* Heart button pinned to the card’s top-right inside main */}
-      <button
-        onClick={toggleSave}
-        disabled={loading}
-        title={savedRow ? "Unsave" : "Save"}
-        className={cn(
-          "absolute -top-2 right-2 px-2 py-1 text-2xl leading-none",
-          savedRow ? "text-red-500" : "text-black/70 hover:text-black"
-        )}
-        aria-label={savedRow ? "Unsave Idea" : "Save Idea"}
-      >
-        {savedRow ? "❤️" : "🖤"}
-      </button>
+      {/* Title row with a fixed spot for the heart */}
+      <div className="mb-6 grid grid-cols-[1fr_auto] items-start gap-3">
+        <h1 className="text-3xl font-bold text-primary">
+          📹 {idea.title}
+        </h1>
 
-      {/* Login modal */}
+        <button
+          onClick={toggleSave}
+          disabled={loading}
+          title={savedRow ? "Unsave" : "Save"}
+          className={cn(
+            "rounded-md px-2 py-1 text-2xl leading-none transition-colors",
+            savedRow ? "text-red-500" : "text-black/70 hover:text-black"
+          )}
+          aria-label={savedRow ? "Unsave Idea" : "Save Idea"}
+        >
+          {savedRow ? "❤️" : "🖤"}
+        </button>
+      </div>
+
+
       <Dialog open={loginModal} onOpenChange={setLoginModal}>
         <DialogContent>
           <DialogHeader>
@@ -100,7 +109,7 @@ export default function IdeaDetailPage({ params }: { params: { id: string } }) {
         </DialogContent>
       </Dialog>
 
-      <h1 className="text-3xl font-bold mb-6 text-primary">📹 {idea.title}</h1>
+      {/* <h1 className="text-3xl font-bold mb-6 text-primary">📹 {idea.title}</h1> */}
       <p className="text-lg leading-relaxed text-gray-800 mb-10">{idea.description}</p>
 
       <div className="flex gap-4 flex-wrap">

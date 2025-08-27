@@ -1,17 +1,17 @@
-import { FC } from "react";
+// src/components/blocks/IdeasBlock.tsx
+"use client";
+
 import { useRouter } from "next/navigation";
 
-interface Idea {
-  title: string;
-  description?: string;
-}
+type Idea = { id: string; title: string; description?: string };
 
-interface Props {
+export default function IdeasBlock({
+  ideas,
+  query,
+}: {
   ideas: Idea[];
   query: string;
-}
-
-const IdeasBlock: FC<Props> = ({ ideas, query }) => {
+}) {
   const router = useRouter();
 
   if (!ideas.length) return null;
@@ -21,13 +21,15 @@ const IdeasBlock: FC<Props> = ({ ideas, query }) => {
   return (
     <section className="w-full max-w-2xl mt-8 px-4">
       <h2 className="text-2xl font-semibold text-primary">Your Video Ideas</h2>
-      <p className="text-sm italic text-gray-600 mt-1 mb-6">for: “{cleanQuery}”</p>
+      <p className="text-sm italic text-gray-600 mt-1 mb-6">
+        for: “{cleanQuery}”
+      </p>
 
       <div className="divide-y divide-gray-200">
         {ideas.map((idea, idx) => (
           <div
-            key={idx}
-            onClick={() => router.push(`/idea/${idx}`)}
+            key={idea.id} // ← use stable id
+            onClick={() => router.push(`/idea/${encodeURIComponent(idea.id)}`)} // ← use id, not index
             className="py-5 cursor-pointer group transition-all"
           >
             <div className="flex items-start justify-between">
@@ -45,6 +47,4 @@ const IdeasBlock: FC<Props> = ({ ideas, query }) => {
       </div>
     </section>
   );
-};
-
-export default IdeasBlock;
+}

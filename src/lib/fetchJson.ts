@@ -21,38 +21,55 @@ function readSbAccessToken(): string | undefined {
   }
 }
 
-export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers || {});
-  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+export async function fetchJson<T = any>(
+  input: RequestInfo | URL,
+  init: RequestInit = {}
+): Promise<T> {
+  const headers = new Headers(init.headers);
 
-  // 1) Try fast sync path (no network)
-  let accessToken = readSbAccessToken();
+  // Only set JSON header when we're actually sending a body
+  if (init.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
-  // 2) Fallback: ask supabase (no aggressive timeout)
-  if (!accessToken) {
+  // Try to attach Supabase access token (if available)
+  try {
+    // If you have your own readSbAccessToken(), use it here first
+    const sb = supabaseBrowser();
+    const { data } = await sb.auth.getSession();
+    const access = data.session?.access_token;
+    if (access && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${access}`);
+    }
+  } catch {
+    // no-op: continue unauthenticated
+  }
+
+  const res = await fetch(input, { ...init, headers });
+
+  // Read as text first (handles 204 No Content and non-JSON)
+  const raw = await res.text();
+  const hasBody = raw.length > 0;
+
+  let data: any = null;
+  if (hasBody) {
     try {
-      const sb = supabaseBrowser();
-      const { data } = await sb.auth.getSession();
-      accessToken = data.session?.access_token;
+      data = JSON.parse(raw);
     } catch {
-      // continue unauthenticated
+      data = raw; // fall back to plain text
     }
   }
 
-  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
-
-  const res = await fetch(input, {
-    ...init,
-    headers,
-  });
-
   if (!res.ok) {
-    let body: any = {};
-    try { body = await res.json(); } catch {}
-    const err: any = new Error(body.error || body.message || `HTTP ${res.status}`);
+    const err: any = new Error(
+      (data && typeof data === "object" && (data.error || data.message)) ||
+      `HTTP ${res.status}`
+    );
     err.code = res.status;
-    err.body = body;
+    err.data = data;
     throw err;
   }
-  return res.json() as Promise<T>;
+
+  // For 204/empty responses return null; otherwise parsed JSON or text
+  return data as T;
 }

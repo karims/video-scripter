@@ -3,16 +3,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-// (If fetchJson doesn't force content-type, we can inline fetch to be sure.)
+import IdeasBlock from "@/components/blocks/IdeasBlock";
+import FreeLimitModal from "@/components/ui/FreeLimitModal";
+import { useUser } from "@/context/UserContext";
 
 type Idea = { id: string; title: string; description?: string };
 
 export default function HomePage() {
   const router = useRouter();
+  const { user } = useUser(); // to tweak copy for logged-in users
+
   const [query, setQuery] = useState("");
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [limitOpen, setLimitOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -35,18 +40,25 @@ export default function HomePage() {
     try {
       const r = await fetch("/api/ideas", {
         method: "POST",
-        headers: { "Content-Type": "application/json" }, // ensure JSON
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q }),
       });
-      const data = await r.json();
+      const data = await r.json().catch(() => ({}));
+
       if (!r.ok) {
-        if (r.status === 401) setErr("Please sign in to generate ideas. It’s quick!");
-        else if (r.status === 402) router.push("/pricing?limit=free");
-        else setErr(data?.error || "Something went wrong");
+        if (r.status === 401) {
+          setErr("Please sign in to generate ideas. It’s quick!");
+        } else if (r.status === 402) {
+          // FREE_LIMIT_REACHED -> open modal instead of hard redirect
+          setLimitOpen(true);
+        } else {
+          setErr((data as any)?.error || "Something went wrong");
+        }
         return;
       }
-      setIdeas(data.ideas);
-      sessionStorage.setItem("lastIdeasPayload", JSON.stringify({ query: q, ideas: data.ideas }));
+
+      setIdeas((data as any).ideas);
+      sessionStorage.setItem("lastIdeasPayload", JSON.stringify({ query: q, ideas: (data as any).ideas }));
     } catch {
       setErr("Network error");
     } finally {
@@ -76,7 +88,14 @@ export default function HomePage() {
 
       {err && <p className="text-red-600 mt-3 text-sm">{err}</p>}
 
-      {/* keep your IdeasBlock as is */}
+      <IdeasBlock ideas={ideas} query={query} />
+
+      {/* Limit modal */}
+      <FreeLimitModal
+        open={limitOpen}
+        onOpenChange={setLimitOpen}
+        isLoggedIn={!!user}
+      />
     </main>
   );
 }
