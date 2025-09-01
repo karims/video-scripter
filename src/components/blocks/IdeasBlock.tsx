@@ -1,19 +1,20 @@
-// src/components/blocks/IdeasBlock.tsx
 "use client";
 
-import { useRouter } from "next/navigation";
+import { FC } from "react";
+import Link from "next/link";
 
-type Idea = { id: string; title: string; description?: string };
+interface Idea {
+  id: string;
+  title: string;
+  description?: string;
+}
 
-export default function IdeasBlock({
-  ideas,
-  query,
-}: {
+interface Props {
   ideas: Idea[];
   query: string;
-}) {
-  const router = useRouter();
+}
 
+const IdeasBlock: FC<Props> = ({ ideas, query }) => {
   if (!ideas.length) return null;
 
   const cleanQuery = query.length > 100 ? query.slice(0, 97) + "..." : query;
@@ -21,16 +22,14 @@ export default function IdeasBlock({
   return (
     <section className="w-full max-w-2xl mt-8 px-4">
       <h2 className="text-2xl font-semibold text-primary">Your Video Ideas</h2>
-      <p className="text-sm italic text-gray-600 mt-1 mb-6">
-        for: “{cleanQuery}”
-      </p>
+      <p className="text-sm italic text-gray-600 mt-1 mb-6">for: “{cleanQuery}”</p>
 
       <div className="divide-y divide-gray-200">
         {ideas.map((idea, idx) => (
-          <div
-            key={idea.id} // ← use stable id
-            onClick={() => router.push(`/idea/${encodeURIComponent(idea.id)}`)} // ← use id, not index
-            className="py-5 cursor-pointer group transition-all"
+          <Link
+            key={idea.id}
+            href={`/idea/${idea.id}`}
+            className="block py-5 group transition-all"
           >
             <div className="flex items-start justify-between">
               <h3 className="text-lg font-bold text-black group-hover:underline underline-offset-4 decoration-primary transition">
@@ -42,9 +41,11 @@ export default function IdeasBlock({
                 {idea.description}
               </p>
             )}
-          </div>
+          </Link>
         ))}
       </div>
     </section>
   );
-}
+};
+
+export default IdeasBlock;
