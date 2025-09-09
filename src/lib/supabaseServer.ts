@@ -1,5 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
 // Matches the current docs / example: use getAll/setAll + try/catch
 export async function createSupabaseServerClient() {
@@ -26,4 +31,21 @@ export async function createSupabaseServerClient() {
       },
     }
   );
+}
+
+/**
+ * For Route Handlers (/app/api/*) where you have access to NextRequest.
+ * Also relies on middleware for session refresh; setAll is a no-op.
+ */
+export function createSupabaseServerFromRequest(req: NextRequest): SupabaseClient {
+  return createServerClient(URL, KEY, {
+    cookies: {
+      getAll() {
+        return req.cookies.getAll();
+      },
+      setAll() {
+        /* no-op (middleware handles refresh) */
+      },
+    },
+  });
 }
