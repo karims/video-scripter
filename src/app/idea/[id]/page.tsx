@@ -68,7 +68,7 @@ export default function IdeaDetailPage() {
           body: JSON.stringify({
             id: ideaId,
             title: idea.title,
-            description: idea.description,
+            description: idea.description ?? "",
             params,
             expand: "preview",
           }),
